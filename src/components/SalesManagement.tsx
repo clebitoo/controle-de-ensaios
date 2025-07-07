@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Edit, DollarSign } from 'lucide-react';
+import { Edit, DollarSign, Send, ExternalLink } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 interface Session {
@@ -28,6 +28,7 @@ interface Sale {
   clientEmail: string;
   clientWhatsapp: string;
   timestamp: string;
+  deliveryStatus?: 'pending' | 'sent';
 }
 
 const SalesManagement = () => {
@@ -79,6 +80,15 @@ const SalesManagement = () => {
     setClientWhatsapp('');
   };
 
+  const formatCurrency = (value: number) => {
+    return value.toLocaleString('pt-BR', { 
+      style: 'currency', 
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
   const handleEditSession = (session: Session) => {
     setSelectedSession(session);
     
@@ -120,7 +130,8 @@ const SalesManagement = () => {
       clientName,
       clientEmail,
       clientWhatsapp,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      deliveryStatus: saleStatus === 'VD' ? 'pending' : undefined
     };
 
     const updatedSales = sales.filter(sale => sale.sessionId !== selectedSession.id);
@@ -136,6 +147,40 @@ const SalesManagement = () => {
     toast({
       title: "Sucesso",
       description: "Venda registrada com sucesso!",
+    });
+  };
+
+  const handleDelivery = (sessionId: string) => {
+    // Open WeTransfer
+    window.open('https://wetransfer.com/', '_blank');
+    
+    // Try to open file explorer (works in some browsers with user interaction)
+    try {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.style.display = 'none';
+      input.multiple = true;
+      input.webkitdirectory = true;
+      document.body.appendChild(input);
+      input.click();
+      document.body.removeChild(input);
+    } catch (error) {
+      console.log('Could not open file explorer automatically');
+    }
+
+    // Update delivery status
+    const updatedSales = sales.map(sale => 
+      sale.sessionId === sessionId 
+        ? { ...sale, deliveryStatus: 'sent' as const }
+        : sale
+    );
+    
+    localStorage.setItem('photoSales', JSON.stringify(updatedSales));
+    setSales(updatedSales);
+    
+    toast({
+      title: "Entrega iniciada",
+      description: "WeTransfer aberto e status atualizado para enviado.",
     });
   };
 
@@ -170,6 +215,22 @@ const SalesManagement = () => {
     }
   };
 
+  const getDeliveryStatusColor = (status?: string) => {
+    switch (status) {
+      case 'sent': return 'text-green-400';
+      case 'pending': return 'text-yellow-400';
+      default: return 'text-gray-400';
+    }
+  };
+
+  const getDeliveryStatusText = (status?: string) => {
+    switch (status) {
+      case 'sent': return 'Enviado';
+      case 'pending': return 'Pendente';
+      default: return '-';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card className="bg-gray-700 border-gray-600">
@@ -186,7 +247,7 @@ const SalesManagement = () => {
                 return (
                   <div key={session.id} className="p-4 bg-gray-600 rounded-lg">
                     <div className="flex items-center justify-between">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
                         <div>
                           <span className="text-xs text-gray-400">Fotógrafo:</span>
                           <p className="text-white font-medium">{session.photographer}</p>
@@ -208,7 +269,7 @@ const SalesManagement = () => {
                             </div>
                             <div>
                               <span className="text-xs text-gray-400">Valor:</span>
-                              <p className="text-green-400 font-medium">R$ {saleInfo.saleValue.toFixed(2)}</p>
+                              <p className="text-green-400 font-medium">{formatCurrency(saleInfo.saleValue)}</p>
                             </div>
                             <div>
                               <span className="text-xs text-gray-400">Status:</span>
@@ -216,23 +277,43 @@ const SalesManagement = () => {
                                 {getStatusText(saleInfo.saleStatus)}
                               </p>
                             </div>
+                            <div>
+                              <span className="text-xs text-gray-400">Entrega:</span>
+                              <p className={`font-medium ${getDeliveryStatusColor(saleInfo.deliveryStatus)}`}>
+                                {getDeliveryStatusText(saleInfo.deliveryStatus)}
+                              </p>
+                            </div>
                           </>
                         )}
                       </div>
                       
-                      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
+                      <div className="flex gap-2 ml-4">
+                        {saleInfo && saleInfo.saleStatus === 'VD' && saleInfo.deliveryStatus === 'pending' && (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleEditSession(session)}
-                            className="ml-4 bg-blue-600 hover:bg-blue-700 border-blue-500 text-white"
+                            onClick={() => handleDelivery(session.id)}
+                            className="bg-green-600 hover:bg-green-700 border-green-500 text-white"
                           >
-                            {saleInfo ? <Edit size={16} /> : <DollarSign size={16} />}
-                            {saleInfo ? 'Editar' : 'Vender'}
+                            <Send size={16} />
+                            Enviar
                           </Button>
-                        </DialogTrigger>
-                      </Dialog>
+                        )}
+                        
+                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditSession(session)}
+                              className="bg-blue-600 hover:bg-blue-700 border-blue-500 text-white"
+                            >
+                              {saleInfo ? <Edit size={16} /> : <DollarSign size={16} />}
+                              {saleInfo ? 'Editar' : 'Vender'}
+                            </Button>
+                          </DialogTrigger>
+                        </Dialog>
+                      </div>
                     </div>
                   </div>
                 );
@@ -289,14 +370,14 @@ const SalesManagement = () => {
                   onChange={(e) => setSaleValue(e.target.value)}
                   type="number"
                   step="0.01"
-                  placeholder="Ex: 150.00"
+                  placeholder="Ex: 150,00"
                   className="bg-gray-600 border-gray-500 text-white"
                 />
               </div>
               
               <div>
                 <Label className="text-gray-300">Forma de Pagamento</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <Select value={paymentMethod} onValueChange={(value: 'pix' | 'cartao' | 'dinheiro') => setPaymentMethod(value)}>
                   <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
                     <SelectValue />
                   </SelectTrigger>
@@ -311,7 +392,7 @@ const SalesManagement = () => {
 
             <div>
               <Label className="text-gray-300">Status da Venda</Label>
-              <Select value={saleStatus} onValueChange={setSaleStatus}>
+              <Select value={saleStatus} onValueChange={(value: 'VD' | 'D' | 'NV') => setSaleStatus(value)}>
                 <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
                   <SelectValue />
                 </SelectTrigger>

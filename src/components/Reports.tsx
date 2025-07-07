@@ -49,6 +49,15 @@ const Reports = () => {
     if (savedSellers) setSellers(JSON.parse(savedSellers));
   };
 
+  const formatCurrency = (value: number) => {
+    return value.toLocaleString('pt-BR', { 
+      style: 'currency', 
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
   const getTodayDate = () => {
     return new Date().toLocaleDateString('pt-BR');
   };
@@ -112,17 +121,17 @@ const Reports = () => {
 
     const report = `*Ranking ALCHYMIST ${getTodayDate()}
 atualizado: ${getCurrentTime()}*
-
+ 
 **Fotógrafos**
-
+ 
 ${photographerStats.map(p => 
-  `${p.name}: R$ ${p.value.toFixed(2)} / ${p.folders} pastas`
+  `${p.name}: ${formatCurrency(p.value)} / ${p.folders} pastas`
 ).join('\n')}
 
 **Vendedores**
 
 ${sellerStats.map(s => 
-  `${s.name}: R$ ${s.value.toFixed(2)}`
+  `${s.name}: ${formatCurrency(s.value)}`
 ).join('\n')}
 
 Pastas a mostrar: ${foldersToShow}
@@ -132,7 +141,7 @@ NV: ${nvCount}
 D: ${dCount}
 
 Total de pastas: ${totalFolders}
-Total vendido: R$ ${totalSold.toFixed(2)}`;
+Total vendido: ${formatCurrency(totalSold)}`;
 
     return report;
   };
@@ -187,33 +196,35 @@ Total vendido: R$ ${totalSold.toFixed(2)}`;
     const nvCount = todaySales.filter(sale => sale.saleStatus === 'NV').length;
     
     const totalFolders = todaySessions.length;
-    const averageValue = totalFolders > 0 ? totalRevenue / totalFolders : 0;
+    // Média apenas das vendas VD
+    const vdSales = todaySales.filter(sale => sale.saleStatus === 'VD');
+    const averageValue = vdSales.length > 0 ? totalRevenue / vdSales.length : 0;
 
     const report = `*Faturamento ALCHYMIST ${getTodayDate()}*
 
-*R$: ${totalRevenue.toFixed(2)}*
+*${formatCurrency(totalRevenue)}*
 
-Cartão: R$ ${cardTotal.toFixed(2)}
-Pix: R$ ${pixTotal.toFixed(2)}
-Dinheiro: R$ ${cashTotal.toFixed(2)}
+Cartão: ${formatCurrency(cardTotal)}
+Pix: ${formatCurrency(pixTotal)}
+Dinheiro: ${formatCurrency(cashTotal)}
 
 *Fotógrafos*
 
 ${photographerStats.map(p => 
-  `${p.name}: R$ ${p.value.toFixed(2)} / ${p.folders} pastas`
+  `${p.name}: ${formatCurrency(p.value)} / ${p.folders} pastas`
 ).join('\n')}
 
 *Vendedor*
 
 ${sellerStats.map(s => 
-  `${s.name}: R$ ${s.value.toFixed(2)} / ${s.folders} pastas`
+  `${s.name}: ${formatCurrency(s.value)} / ${s.folders} pastas`
 ).join('\n')}
 
 Nv: ${nvCount}
 D: ${dCount}
 VD: ${vdCount}
 Total de Pastas: ${totalFolders}
-Média: R$ ${averageValue.toFixed(2)}`;
+Média: ${formatCurrency(averageValue)}`;
 
     return report;
   };
@@ -306,7 +317,7 @@ Média: R$ ${averageValue.toFixed(2)}`;
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-yellow-400">
-                R$ {getTodaySales().reduce((sum, sale) => sum + sale.saleValue, 0).toFixed(2)}
+                {formatCurrency(getTodaySales().reduce((sum, sale) => sum + sale.saleValue, 0))}
               </p>
               <p className="text-gray-400 text-sm">Faturamento</p>
             </div>
