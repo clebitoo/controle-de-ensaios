@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,12 +8,9 @@ import Reports from '@/components/Reports';
 import Configuration from '@/components/Configuration';
 import Rankings from '@/components/Rankings';
 import Goals from '@/components/Goals';
-
 const Index = () => {
   const [activeTab, setActiveTab] = useState("sessions");
-
-  return (
-    <div className="min-h-screen bg-gray-900 text-white">
+  return <div className="min-h-screen bg-gray-900 text-white">
       <div className="container mx-auto p-4">
         <div className="mb-8">
           <h1 className="text-3xl text-center mb-2 text-zinc-50 font-semibold">Controle de Ensaios Capture Fotografia</h1>
@@ -118,8 +114,6 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
