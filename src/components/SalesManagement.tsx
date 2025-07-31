@@ -30,7 +30,7 @@ interface Sale {
   clientWhatsapp: string;
   timestamp: string;
   deliveryStatus?: 'pending' | 'sent';
-  photoType?: 'selected' | 'complete';
+  photoType?: 'selected' | 'complete' | 'courtesy' | 'none';
 }
 
 const SalesManagement = () => {
@@ -114,10 +114,10 @@ const SalesManagement = () => {
   };
 
   const handleSaveSale = () => {
-    if (!selectedSession || !seller) {
+    if (!selectedSession) {
       toast({
         title: "Erro",
-        description: "Por favor, selecione um vendedor.",
+        description: "Sessão não selecionada.",
         variant: "destructive"
       });
       return;
@@ -133,9 +133,20 @@ const SalesManagement = () => {
       return;
     }
 
+    if (saleStatus === 'NV') {
+      // For "not seen" status, no seller validation needed
+    } else if (!seller) {
+      toast({
+        title: "Erro",
+        description: "Por favor, selecione um vendedor.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const saleData: Sale = {
       sessionId: selectedSession.id,
-      seller,
+      seller: saleStatus === 'NV' ? '' : seller,
       photosQuantity: saleStatus === 'VD' ? (photosQuantity === 'complete' ? 1 : 0) : 0,
       saleValue: saleStatus === 'VD' ? parseFloat(saleValue) : 0,
       paymentMethod,
@@ -145,7 +156,7 @@ const SalesManagement = () => {
       clientWhatsapp,
       timestamp: new Date().toISOString(),
       deliveryStatus: saleStatus === 'VD' ? 'pending' : undefined,
-      photoType: saleStatus === 'VD' ? (photosQuantity as 'selected' | 'complete') : undefined
+      photoType: saleStatus === 'VD' ? (photosQuantity as 'selected' | 'complete') : saleStatus === 'D' ? (photosQuantity as 'courtesy' | 'none') : undefined
     };
 
     const updatedSales = sales.filter(sale => sale.sessionId !== selectedSession.id);
@@ -268,25 +279,6 @@ const SalesManagement = () => {
     }
   };
 
-  const handleOpenFolder = (folderPath: string) => {
-    try {
-      // Create a link that will open file explorer
-      const link = document.createElement('a');
-      link.href = `file:///${folderPath.replace(/\\/g, '/')}`;
-      link.click();
-      
-      toast({
-        title: "Pasta das fotos",
-        description: "Tentando abrir pasta: " + folderPath,
-      });
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível abrir a pasta. Caminho: " + folderPath,
-        variant: "destructive"
-      });
-    }
-  };
 
   const getSaleInfo = (sessionId: string) => {
     return sales.find(sale => sale.sessionId === sessionId);
@@ -462,16 +454,6 @@ const SalesManagement = () => {
                             <Send size={16} />
                             WhatsApp
                           </Button>
-                          {saleInfo?.deliveryStatus === 'pending' && session.folderPath && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenFolder(session.folderPath!)}
-                              className="bg-blue-500 hover:bg-blue-600 border-blue-400 text-white"
-                            >
-                              📁
-                            </Button>
-                          )}
                         </div>
                       )}
                       
@@ -528,21 +510,23 @@ const SalesManagement = () => {
           
           <div className="space-y-4 max-h-96 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-gray-300">Vendedor *</Label>
-                <Select value={seller} onValueChange={setSeller}>
-                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
-                    <SelectValue placeholder="Selecione o vendedor" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-600 border-gray-500">
-                    {sellers.map((sellerName) => (
-                      <SelectItem key={sellerName} value={sellerName} className="text-white hover:bg-gray-500">
-                        {sellerName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {saleStatus !== 'NV' && (
+                <div>
+                  <Label className="text-gray-300">Vendedor *</Label>
+                  <Select value={seller} onValueChange={setSeller}>
+                    <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                      <SelectValue placeholder="Selecione o vendedor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-600 border-gray-500">
+                      {sellers.map((sellerName) => (
+                        <SelectItem key={sellerName} value={sellerName} className="text-white hover:bg-gray-500">
+                          {sellerName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               
               <div>
                 <Label className="text-gray-300">Status da Venda *</Label>
@@ -603,6 +587,22 @@ const SalesManagement = () => {
                   </Select>
                 </div>
               </>
+            )}
+
+            {/* Conditional fields for D status */}
+            {saleStatus === 'D' && (
+              <div>
+                <Label className="text-gray-300">Tipo de Entrega</Label>
+                <Select value={photosQuantity} onValueChange={setPhotosQuantity}>
+                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-600 border-gray-500">
+                    <SelectItem value="courtesy" className="text-white hover:bg-gray-500">Foto Cortesia</SelectItem>
+                    <SelectItem value="none" className="text-white hover:bg-gray-500">Nenhuma</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             )}
 
             <div className="space-y-4 border-t border-gray-600 pt-4">

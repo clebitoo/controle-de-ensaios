@@ -22,7 +22,7 @@ const SessionRegistration = () => {
   const [photographers, setPhotographers] = useState<string[]>([]);
   const [selectedPhotographer, setSelectedPhotographer] = useState('');
   const [modelName, setModelName] = useState('');
-  const [folderPath, setFolderPath] = useState('');
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -60,9 +60,9 @@ const SessionRegistration = () => {
       id: Date.now().toString(),
       photographer: selectedPhotographer,
       model: modelName.trim(),
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toLocaleDateString('pt-BR'),
       status: 'pending',
-      folderPath: folderPath.trim() || undefined
+      
     };
 
     const updatedSessions = [...sessions, newSession];
@@ -70,7 +70,7 @@ const SessionRegistration = () => {
     
     setSelectedPhotographer('');
     setModelName('');
-    setFolderPath('');
+    
     
     toast({
       title: "Sucesso",
@@ -143,16 +143,6 @@ const SessionRegistration = () => {
               />
             </div>
             
-            <div>
-              <Label htmlFor="folder-path" className="text-gray-300">Caminho das Fotos (Opcional)</Label>
-              <Input
-                id="folder-path"
-                value={folderPath}
-                onChange={(e) => setFolderPath(e.target.value)}
-                placeholder="Ex: C:\Fotos\Ensaio_Ramon_Ana"
-                className="bg-gray-600 border-gray-500 text-white placeholder:text-gray-400"
-              />
-            </div>
           </div>
           
           <Button 
