@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Edit, DollarSign, Send, ExternalLink, Filter } from 'lucide-react';
+import { Edit, DollarSign, Send, ExternalLink, Filter, MessageCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 interface Session {
@@ -15,6 +15,7 @@ interface Session {
   model: string;
   date: string;
   status: 'pending' | 'in_progress' | 'completed';
+  folderPath?: string;
 }
 
 interface Sale {
@@ -29,6 +30,7 @@ interface Sale {
   clientWhatsapp: string;
   timestamp: string;
   deliveryStatus?: 'pending' | 'sent';
+  photoType?: 'selected' | 'complete';
 }
 
 const SalesManagement = () => {
@@ -72,7 +74,7 @@ const SalesManagement = () => {
 
   const resetForm = () => {
     setSeller('');
-    setPhotosQuantity('');
+    setPhotosQuantity('selected');
     setSaleValue('');
     setPaymentMethod('pix');
     setSaleStatus('VD');
@@ -97,7 +99,7 @@ const SalesManagement = () => {
     const existingSale = sales.find(sale => sale.sessionId === session.id);
     if (existingSale) {
       setSeller(existingSale.seller);
-      setPhotosQuantity(existingSale.photosQuantity.toString());
+      setPhotosQuantity(existingSale.photoType || 'selected');
       setSaleValue(existingSale.saleValue.toString());
       setPaymentMethod(existingSale.paymentMethod);
       setSaleStatus(existingSale.saleStatus);
@@ -125,7 +127,7 @@ const SalesManagement = () => {
     if (saleStatus === 'VD' && (!photosQuantity || !saleValue)) {
       toast({
         title: "Erro",
-        description: "Para vendas concluídas, preencha quantidade de fotos e valor.",
+        description: "Para vendas concluídas, preencha tipo de ensaio e valor.",
         variant: "destructive"
       });
       return;
@@ -134,7 +136,7 @@ const SalesManagement = () => {
     const saleData: Sale = {
       sessionId: selectedSession.id,
       seller,
-      photosQuantity: saleStatus === 'VD' ? parseInt(photosQuantity) : 0,
+      photosQuantity: saleStatus === 'VD' ? (photosQuantity === 'complete' ? 1 : 0) : 0,
       saleValue: saleStatus === 'VD' ? parseFloat(saleValue) : 0,
       paymentMethod,
       saleStatus,
@@ -142,7 +144,8 @@ const SalesManagement = () => {
       clientEmail,
       clientWhatsapp,
       timestamp: new Date().toISOString(),
-      deliveryStatus: saleStatus === 'VD' ? 'pending' : undefined
+      deliveryStatus: saleStatus === 'VD' ? 'pending' : undefined,
+      photoType: saleStatus === 'VD' ? (photosQuantity as 'selected' | 'complete') : undefined
     };
 
     const updatedSales = sales.filter(sale => sale.sessionId !== selectedSession.id);
@@ -242,6 +245,47 @@ const SalesManagement = () => {
       title: "Entrega iniciada",
       description: "WeTransfer aberto, e-mail copiado e status atualizado.",
     });
+  };
+
+  const handleWhatsApp = async (sessionId: string) => {
+    const sale = sales.find(s => s.sessionId === sessionId);
+    
+    if (sale?.clientWhatsapp) {
+      const cleanWhatsapp = sale.clientWhatsapp.replace(/\D/g, '');
+      const whatsappUrl = `https://web.whatsapp.com/send?phone=55${cleanWhatsapp}`;
+      window.open(whatsappUrl, '_blank');
+      
+      toast({
+        title: "WhatsApp Web aberto",
+        description: `Conversa com ${sale.clientWhatsapp} iniciada.`,
+      });
+    } else {
+      toast({
+        title: "WhatsApp não disponível",
+        description: "Número de WhatsApp não cadastrado para este cliente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleOpenFolder = (folderPath: string) => {
+    try {
+      // Create a link that will open file explorer
+      const link = document.createElement('a');
+      link.href = `file:///${folderPath.replace(/\\/g, '/')}`;
+      link.click();
+      
+      toast({
+        title: "Pasta das fotos",
+        description: "Tentando abrir pasta: " + folderPath,
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível abrir a pasta. Caminho: " + folderPath,
+        variant: "destructive"
+      });
+    }
   };
 
   const getSaleInfo = (sessionId: string) => {
@@ -399,15 +443,36 @@ const SalesManagement = () => {
                     
                     <div className="flex gap-2 ml-4">
                       {saleInfo && saleInfo.saleStatus === 'VD' && saleInfo.deliveryStatus === 'pending' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelivery(session.id)}
-                          className="bg-green-600 hover:bg-green-700 border-green-500 text-white"
-                        >
-                          <Send size={16} />
-                          Enviar
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelivery(session.id)}
+                            className="bg-green-600 hover:bg-green-700 border-green-500 text-white"
+                          >
+                            <Send size={16} />
+                            WeTransfer
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleWhatsApp(session.id)}
+                            className="bg-green-500 hover:bg-green-600 border-green-400 text-white"
+                          >
+                            <Send size={16} />
+                            WhatsApp
+                          </Button>
+                          {saleInfo?.deliveryStatus === 'pending' && session.folderPath && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenFolder(session.folderPath!)}
+                              className="bg-blue-500 hover:bg-blue-600 border-blue-400 text-white"
+                            >
+                              📁
+                            </Button>
+                          )}
+                        </div>
                       )}
                       
                       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -499,14 +564,16 @@ const SalesManagement = () => {
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-gray-300">Quantidade de Fotos *</Label>
-                    <Input
-                      value={photosQuantity}
-                      onChange={(e) => setPhotosQuantity(e.target.value)}
-                      type="number"
-                      placeholder="Ex: 10"
-                      className="bg-gray-600 border-gray-500 text-white"
-                    />
+                    <Label className="text-gray-300">Tipo de Ensaio *</Label>
+                    <Select value={photosQuantity} onValueChange={setPhotosQuantity}>
+                      <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-600 border-gray-500">
+                        <SelectItem value="selected" className="text-white hover:bg-gray-500">Apenas Selecionadas</SelectItem>
+                        <SelectItem value="complete" className="text-white hover:bg-gray-500">Ensaio Completo</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div>

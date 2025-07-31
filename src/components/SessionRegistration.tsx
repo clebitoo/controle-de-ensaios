@@ -14,6 +14,7 @@ interface Session {
   model: string;
   date: string;
   status: 'pending' | 'in_progress' | 'completed';
+  folderPath?: string;
 }
 
 const SessionRegistration = () => {
@@ -21,6 +22,7 @@ const SessionRegistration = () => {
   const [photographers, setPhotographers] = useState<string[]>([]);
   const [selectedPhotographer, setSelectedPhotographer] = useState('');
   const [modelName, setModelName] = useState('');
+  const [folderPath, setFolderPath] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -59,7 +61,8 @@ const SessionRegistration = () => {
       photographer: selectedPhotographer,
       model: modelName.trim(),
       date: new Date().toISOString().split('T')[0],
-      status: 'pending'
+      status: 'pending',
+      folderPath: folderPath.trim() || undefined
     };
 
     const updatedSessions = [...sessions, newSession];
@@ -67,6 +70,7 @@ const SessionRegistration = () => {
     
     setSelectedPhotographer('');
     setModelName('');
+    setFolderPath('');
     
     toast({
       title: "Sucesso",
@@ -133,7 +137,19 @@ const SessionRegistration = () => {
                 id="model"
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddSession()}
                 placeholder="Digite o nome do modelo"
+                className="bg-gray-600 border-gray-500 text-white placeholder:text-gray-400"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="folder-path" className="text-gray-300">Caminho das Fotos (Opcional)</Label>
+              <Input
+                id="folder-path"
+                value={folderPath}
+                onChange={(e) => setFolderPath(e.target.value)}
+                placeholder="Ex: C:\Fotos\Ensaio_Ramon_Ana"
                 className="bg-gray-600 border-gray-500 text-white placeholder:text-gray-400"
               />
             </div>
@@ -171,10 +187,10 @@ const SessionRegistration = () => {
                         <span className="text-xs text-gray-400">Modelo:</span>
                         <p className="text-white font-medium">{session.model}</p>
                       </div>
-                      <div>
-                        <span className="text-xs text-gray-400">Data:</span>
-                        <p className="text-white">{new Date(session.date).toLocaleDateString('pt-BR')}</p>
-                      </div>
+                       <div>
+                         <span className="text-xs text-gray-400">Data:</span>
+                         <p className="text-white">{session.date}</p>
+                       </div>
                       <div>
                         <span className="text-xs text-gray-400">Status:</span>
                         <p className={`font-medium ${getStatusColor(session.status)}`}>
