@@ -18,12 +18,17 @@ interface Session {
   folderPath?: string;
 }
 
+interface PaymentMethod {
+  method: 'pix' | 'cartao' | 'dinheiro';
+  value: number;
+}
+
 interface Sale {
   sessionId: string;
   seller: string;
   photosQuantity: number;
   saleValue: number;
-  paymentMethod: 'pix' | 'cartao' | 'dinheiro';
+  paymentMethods: PaymentMethod[];
   saleStatus: 'VD' | 'D' | 'NV';
   clientName: string;
   clientEmail: string;
@@ -46,7 +51,7 @@ const SalesManagement = () => {
   const [seller, setSeller] = useState('');
   const [photosQuantity, setPhotosQuantity] = useState('');
   const [saleValue, setSaleValue] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'cartao' | 'dinheiro'>('pix');
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([{ method: 'pix', value: 0 }]);
   const [saleStatus, setSaleStatus] = useState<'VD' | 'D' | 'NV'>('VD');
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
@@ -76,7 +81,7 @@ const SalesManagement = () => {
     setSeller('');
     setPhotosQuantity('selected');
     setSaleValue('');
-    setPaymentMethod('pix');
+    setPaymentMethods([{ method: 'pix', value: 0 }]);
     setSaleStatus('VD');
     setClientName('');
     setClientEmail('');
@@ -101,7 +106,7 @@ const SalesManagement = () => {
       setSeller(existingSale.seller);
       setPhotosQuantity(existingSale.photoType || 'selected');
       setSaleValue(existingSale.saleValue.toString());
-      setPaymentMethod(existingSale.paymentMethod);
+      setPaymentMethods(existingSale.paymentMethods || [{ method: 'pix', value: existingSale.saleValue }]);
       setSaleStatus(existingSale.saleStatus);
       setClientName(existingSale.clientName);
       setClientEmail(existingSale.clientEmail);
@@ -149,7 +154,7 @@ const SalesManagement = () => {
       seller: saleStatus === 'NV' ? '' : seller,
       photosQuantity: saleStatus === 'VD' ? (photosQuantity === 'complete' ? 1 : 0) : 0,
       saleValue: saleStatus === 'VD' ? parseFloat(saleValue) : 0,
-      paymentMethod,
+      paymentMethods: saleStatus === 'VD' ? paymentMethods : [],
       saleStatus,
       clientName,
       clientEmail,
@@ -473,25 +478,40 @@ const SalesManagement = () => {
                     </div>
                   </div>
                   
-                  {/* Client contact info */}
-                  {saleInfo && (saleInfo.clientEmail || saleInfo.clientWhatsapp) && (
-                    <div className="mt-3 pt-3 border-t border-gray-500">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {saleInfo.clientEmail && (
-                          <div>
-                            <span className="text-xs text-gray-400">E-mail:</span>
-                            <p className="text-blue-300 text-sm">{saleInfo.clientEmail}</p>
-                          </div>
-                        )}
-                        {saleInfo.clientWhatsapp && (
-                          <div>
-                            <span className="text-xs text-gray-400">WhatsApp:</span>
-                            <p className="text-green-300 text-sm">{saleInfo.clientWhatsapp}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                   {/* Payment info for sold items */}
+                   {saleInfo && saleInfo.saleStatus === 'VD' && saleInfo.paymentMethods && saleInfo.paymentMethods.length > 0 && (
+                     <div className="mt-3 pt-3 border-t border-gray-500">
+                       <div className="flex flex-wrap gap-2">
+                         <span className="text-xs text-gray-400">Pagamento:</span>
+                         {saleInfo.paymentMethods.map((payment, index) => (
+                           <span key={index} className="text-blue-300 text-sm">
+                             {getPaymentMethodText(payment.method)}: {formatCurrency(payment.value)}
+                             {index < saleInfo.paymentMethods.length - 1 && ' + '}
+                           </span>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+
+                   {/* Client contact info */}
+                   {saleInfo && (saleInfo.clientEmail || saleInfo.clientWhatsapp) && (
+                     <div className="mt-3 pt-3 border-t border-gray-500">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                         {saleInfo.clientEmail && (
+                           <div>
+                             <span className="text-xs text-gray-400">E-mail:</span>
+                             <p className="text-blue-300 text-sm">{saleInfo.clientEmail}</p>
+                           </div>
+                         )}
+                         {saleInfo.clientWhatsapp && (
+                           <div>
+                             <span className="text-xs text-gray-400">WhatsApp:</span>
+                             <p className="text-green-300 text-sm">{saleInfo.clientWhatsapp}</p>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   )}
                 </div>
               ))}
             </div>
@@ -573,18 +593,85 @@ const SalesManagement = () => {
                   </div>
                 </div>
 
-                <div>
-                  <Label className="text-gray-300">Forma de Pagamento</Label>
-                  <Select value={paymentMethod} onValueChange={(value: 'pix' | 'cartao' | 'dinheiro') => setPaymentMethod(value)}>
-                    <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-600 border-gray-500">
-                      <SelectItem value="pix" className="text-white hover:bg-gray-500">PIX</SelectItem>
-                      <SelectItem value="cartao" className="text-white hover:bg-gray-500">Cartão</SelectItem>
-                      <SelectItem value="dinheiro" className="text-white hover:bg-gray-500">Dinheiro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-300">Formas de Pagamento</Label>
+                    {paymentMethods.length < 2 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPaymentMethods([...paymentMethods, { method: 'cartao', value: 0 }])}
+                        className="border-blue-500 text-blue-400 hover:bg-blue-600 hover:text-white"
+                      >
+                        + Adicionar segunda forma
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {paymentMethods.map((payment, index) => (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-700 rounded-lg">
+                      <div>
+                        <Label className="text-gray-300 text-sm">Forma de Pagamento {index + 1}</Label>
+                        <Select
+                          value={payment.method}
+                          onValueChange={(value: 'pix' | 'cartao' | 'dinheiro') => {
+                            const newPayments = [...paymentMethods];
+                            newPayments[index].method = value;
+                            setPaymentMethods(newPayments);
+                          }}
+                        >
+                          <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-gray-600 border-gray-500">
+                            <SelectItem value="pix" className="text-white hover:bg-gray-500">PIX</SelectItem>
+                            <SelectItem value="cartao" className="text-white hover:bg-gray-500">Cartão</SelectItem>
+                            <SelectItem value="dinheiro" className="text-white hover:bg-gray-500">Dinheiro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label className="text-gray-300 text-sm">Valor (R$)</Label>
+                        <Input
+                          value={payment.value || ''}
+                          onChange={(e) => {
+                            const newPayments = [...paymentMethods];
+                            newPayments[index].value = parseFloat(e.target.value) || 0;
+                            setPaymentMethods(newPayments);
+                          }}
+                          type="number"
+                          step="0.01"
+                          placeholder="Ex: 40,00"
+                          className="bg-gray-600 border-gray-500 text-white"
+                        />
+                      </div>
+                      
+                      {paymentMethods.length > 1 && (
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newPayments = paymentMethods.filter((_, i) => i !== index);
+                              setPaymentMethods(newPayments);
+                            }}
+                            className="border-red-500 text-red-400 hover:bg-red-600 hover:text-white"
+                          >
+                            Remover
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {paymentMethods.length > 1 && (
+                    <div className="text-sm text-gray-400">
+                      Total: {formatCurrency(paymentMethods.reduce((sum, p) => sum + (p.value || 0), 0))}
+                    </div>
+                  )}
                 </div>
               </>
             )}
