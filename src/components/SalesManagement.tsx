@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Edit, DollarSign, Send, ExternalLink, Filter, MessageCircle } from 'lucide-react';
+import { Edit, DollarSign, Send, ExternalLink, Filter } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 interface Session {
@@ -15,12 +15,6 @@ interface Session {
   model: string;
   date: string;
   status: 'pending' | 'in_progress' | 'completed';
-  folderPath?: string;
-}
-
-interface PaymentMethod {
-  method: 'pix' | 'cartao' | 'dinheiro';
-  value: number;
 }
 
 interface Sale {
@@ -28,14 +22,13 @@ interface Sale {
   seller: string;
   photosQuantity: number;
   saleValue: number;
-  paymentMethods: PaymentMethod[];
+  paymentMethod: 'pix' | 'cartao' | 'dinheiro';
   saleStatus: 'VD' | 'D' | 'NV';
   clientName: string;
   clientEmail: string;
   clientWhatsapp: string;
   timestamp: string;
   deliveryStatus?: 'pending' | 'sent';
-  photoType?: 'selected' | 'complete' | 'courtesy' | 'none';
 }
 
 const SalesManagement = () => {
@@ -51,7 +44,7 @@ const SalesManagement = () => {
   const [seller, setSeller] = useState('');
   const [photosQuantity, setPhotosQuantity] = useState('');
   const [saleValue, setSaleValue] = useState('');
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([{ method: 'pix', value: 0 }]);
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'cartao' | 'dinheiro'>('pix');
   const [saleStatus, setSaleStatus] = useState<'VD' | 'D' | 'NV'>('VD');
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
@@ -79,9 +72,9 @@ const SalesManagement = () => {
 
   const resetForm = () => {
     setSeller('');
-    setPhotosQuantity('selected');
+    setPhotosQuantity('');
     setSaleValue('');
-    setPaymentMethods([{ method: 'pix', value: 0 }]);
+    setPaymentMethod('pix');
     setSaleStatus('VD');
     setClientName('');
     setClientEmail('');
@@ -104,9 +97,9 @@ const SalesManagement = () => {
     const existingSale = sales.find(sale => sale.sessionId === session.id);
     if (existingSale) {
       setSeller(existingSale.seller);
-      setPhotosQuantity(existingSale.photoType || 'selected');
+      setPhotosQuantity(existingSale.photosQuantity.toString());
       setSaleValue(existingSale.saleValue.toString());
-      setPaymentMethods(existingSale.paymentMethods || [{ method: 'pix', value: existingSale.saleValue }]);
+      setPaymentMethod(existingSale.paymentMethod);
       setSaleStatus(existingSale.saleStatus);
       setClientName(existingSale.clientName);
       setClientEmail(existingSale.clientEmail);
@@ -119,10 +112,10 @@ const SalesManagement = () => {
   };
 
   const handleSaveSale = () => {
-    if (!selectedSession) {
+    if (!selectedSession || !seller) {
       toast({
         title: "Erro",
-        description: "Sessão não selecionada.",
+        description: "Por favor, selecione um vendedor.",
         variant: "destructive"
       });
       return;
@@ -132,18 +125,7 @@ const SalesManagement = () => {
     if (saleStatus === 'VD' && (!photosQuantity || !saleValue)) {
       toast({
         title: "Erro",
-        description: "Para vendas concluídas, preencha tipo de ensaio e valor.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (saleStatus === 'NV') {
-      // For "not seen" status, no seller validation needed
-    } else if (!seller) {
-      toast({
-        title: "Erro",
-        description: "Por favor, selecione um vendedor.",
+        description: "Para vendas concluídas, preencha quantidade de fotos e valor.",
         variant: "destructive"
       });
       return;
@@ -151,17 +133,16 @@ const SalesManagement = () => {
 
     const saleData: Sale = {
       sessionId: selectedSession.id,
-      seller: saleStatus === 'NV' ? '' : seller,
-      photosQuantity: saleStatus === 'VD' ? (photosQuantity === 'complete' ? 1 : 0) : 0,
+      seller,
+      photosQuantity: saleStatus === 'VD' ? parseInt(photosQuantity) : 0,
       saleValue: saleStatus === 'VD' ? parseFloat(saleValue) : 0,
-      paymentMethods: saleStatus === 'VD' ? paymentMethods : [],
+      paymentMethod,
       saleStatus,
       clientName,
       clientEmail,
       clientWhatsapp,
       timestamp: new Date().toISOString(),
-      deliveryStatus: saleStatus === 'VD' ? 'pending' : undefined,
-      photoType: saleStatus === 'VD' ? (photosQuantity as 'selected' | 'complete') : saleStatus === 'D' ? (photosQuantity as 'courtesy' | 'none') : undefined
+      deliveryStatus: saleStatus === 'VD' ? 'pending' : undefined
     };
 
     const updatedSales = sales.filter(sale => sale.sessionId !== selectedSession.id);
@@ -178,9 +159,6 @@ const SalesManagement = () => {
     );
     localStorage.setItem('photoSessions', JSON.stringify(updatedSessions));
     setSessions(updatedSessions);
-    
-    // Dispara evento para atualizar relatórios
-    window.dispatchEvent(new Event('localStorageUpdate'));
     
     setIsDialogOpen(false);
     resetForm();
@@ -265,28 +243,6 @@ const SalesManagement = () => {
       description: "WeTransfer aberto, e-mail copiado e status atualizado.",
     });
   };
-
-  const handleWhatsApp = async (sessionId: string) => {
-    const sale = sales.find(s => s.sessionId === sessionId);
-    
-    if (sale?.clientWhatsapp) {
-      const cleanWhatsapp = sale.clientWhatsapp.replace(/\D/g, '');
-      const whatsappUrl = `https://web.whatsapp.com/send?phone=55${cleanWhatsapp}`;
-      window.open(whatsappUrl, '_blank');
-      
-      toast({
-        title: "WhatsApp Web aberto",
-        description: `Conversa com ${sale.clientWhatsapp} iniciada.`,
-      });
-    } else {
-      toast({
-        title: "WhatsApp não disponível",
-        description: "Número de WhatsApp não cadastrado para este cliente.",
-        variant: "destructive"
-      });
-    }
-  };
-
 
   const getSaleInfo = (sessionId: string) => {
     return sales.find(sale => sale.sessionId === sessionId);
@@ -443,26 +399,15 @@ const SalesManagement = () => {
                     
                     <div className="flex gap-2 ml-4">
                       {saleInfo && saleInfo.saleStatus === 'VD' && saleInfo.deliveryStatus === 'pending' && (
-                        <div className="flex gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelivery(session.id)}
-                            className="bg-green-600 hover:bg-green-700 border-green-500 text-white"
-                          >
-                            <Send size={16} />
-                            WeTransfer
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleWhatsApp(session.id)}
-                            className="bg-green-500 hover:bg-green-600 border-green-400 text-white"
-                          >
-                            <Send size={16} />
-                            WhatsApp
-                          </Button>
-                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelivery(session.id)}
+                          className="bg-green-600 hover:bg-green-700 border-green-500 text-white"
+                        >
+                          <Send size={16} />
+                          Enviar
+                        </Button>
                       )}
                       
                       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -481,40 +426,25 @@ const SalesManagement = () => {
                     </div>
                   </div>
                   
-                   {/* Payment info for sold items */}
-                   {saleInfo && saleInfo.saleStatus === 'VD' && saleInfo.paymentMethods && saleInfo.paymentMethods.length > 0 && (
-                     <div className="mt-3 pt-3 border-t border-gray-500">
-                       <div className="flex flex-wrap gap-2">
-                         <span className="text-xs text-gray-400">Pagamento:</span>
-                         {saleInfo.paymentMethods.map((payment, index) => (
-                           <span key={index} className="text-blue-300 text-sm">
-                             {getPaymentMethodText(payment.method)}: {formatCurrency(payment.value)}
-                             {index < saleInfo.paymentMethods.length - 1 && ' + '}
-                           </span>
-                         ))}
-                       </div>
-                     </div>
-                   )}
-
-                   {/* Client contact info */}
-                   {saleInfo && (saleInfo.clientEmail || saleInfo.clientWhatsapp) && (
-                     <div className="mt-3 pt-3 border-t border-gray-500">
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                         {saleInfo.clientEmail && (
-                           <div>
-                             <span className="text-xs text-gray-400">E-mail:</span>
-                             <p className="text-blue-300 text-sm">{saleInfo.clientEmail}</p>
-                           </div>
-                         )}
-                         {saleInfo.clientWhatsapp && (
-                           <div>
-                             <span className="text-xs text-gray-400">WhatsApp:</span>
-                             <p className="text-green-300 text-sm">{saleInfo.clientWhatsapp}</p>
-                           </div>
-                         )}
-                       </div>
-                     </div>
-                   )}
+                  {/* Client contact info */}
+                  {saleInfo && (saleInfo.clientEmail || saleInfo.clientWhatsapp) && (
+                    <div className="mt-3 pt-3 border-t border-gray-500">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {saleInfo.clientEmail && (
+                          <div>
+                            <span className="text-xs text-gray-400">E-mail:</span>
+                            <p className="text-blue-300 text-sm">{saleInfo.clientEmail}</p>
+                          </div>
+                        )}
+                        {saleInfo.clientWhatsapp && (
+                          <div>
+                            <span className="text-xs text-gray-400">WhatsApp:</span>
+                            <p className="text-green-300 text-sm">{saleInfo.clientWhatsapp}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -533,23 +463,21 @@ const SalesManagement = () => {
           
           <div className="space-y-4 max-h-96 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {saleStatus !== 'NV' && (
-                <div>
-                  <Label className="text-gray-300">Vendedor *</Label>
-                  <Select value={seller} onValueChange={setSeller}>
-                    <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
-                      <SelectValue placeholder="Selecione o vendedor" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-600 border-gray-500">
-                      {sellers.map((sellerName) => (
-                        <SelectItem key={sellerName} value={sellerName} className="text-white hover:bg-gray-500">
-                          {sellerName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div>
+                <Label className="text-gray-300">Vendedor *</Label>
+                <Select value={seller} onValueChange={setSeller}>
+                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                    <SelectValue placeholder="Selecione o vendedor" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-600 border-gray-500">
+                    {sellers.map((sellerName) => (
+                      <SelectItem key={sellerName} value={sellerName} className="text-white hover:bg-gray-500">
+                        {sellerName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               
               <div>
                 <Label className="text-gray-300">Status da Venda *</Label>
@@ -571,16 +499,14 @@ const SalesManagement = () => {
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-gray-300">Tipo de Ensaio *</Label>
-                    <Select value={photosQuantity} onValueChange={setPhotosQuantity}>
-                      <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-600 border-gray-500">
-                        <SelectItem value="selected" className="text-white hover:bg-gray-500">Apenas Selecionadas</SelectItem>
-                        <SelectItem value="complete" className="text-white hover:bg-gray-500">Ensaio Completo</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-gray-300">Quantidade de Fotos *</Label>
+                    <Input
+                      value={photosQuantity}
+                      onChange={(e) => setPhotosQuantity(e.target.value)}
+                      type="number"
+                      placeholder="Ex: 10"
+                      className="bg-gray-600 border-gray-500 text-white"
+                    />
                   </div>
                   
                   <div>
@@ -596,103 +522,20 @@ const SalesManagement = () => {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-gray-300">Formas de Pagamento</Label>
-                    {paymentMethods.length < 2 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPaymentMethods([...paymentMethods, { method: 'cartao', value: 0 }])}
-                        className="border-blue-500 text-blue-400 hover:bg-blue-600 hover:text-white"
-                      >
-                        + Adicionar segunda forma
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {paymentMethods.map((payment, index) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-700 rounded-lg">
-                      <div>
-                        <Label className="text-gray-300 text-sm">Forma de Pagamento {index + 1}</Label>
-                        <Select
-                          value={payment.method}
-                          onValueChange={(value: 'pix' | 'cartao' | 'dinheiro') => {
-                            const newPayments = [...paymentMethods];
-                            newPayments[index].method = value;
-                            setPaymentMethods(newPayments);
-                          }}
-                        >
-                          <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-gray-600 border-gray-500">
-                            <SelectItem value="pix" className="text-white hover:bg-gray-500">PIX</SelectItem>
-                            <SelectItem value="cartao" className="text-white hover:bg-gray-500">Cartão</SelectItem>
-                            <SelectItem value="dinheiro" className="text-white hover:bg-gray-500">Dinheiro</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div>
-                        <Label className="text-gray-300 text-sm">Valor (R$)</Label>
-                        <Input
-                          value={payment.value || ''}
-                          onChange={(e) => {
-                            const newPayments = [...paymentMethods];
-                            newPayments[index].value = parseFloat(e.target.value) || 0;
-                            setPaymentMethods(newPayments);
-                          }}
-                          type="number"
-                          step="0.01"
-                          placeholder="Ex: 40,00"
-                          className="bg-gray-600 border-gray-500 text-white"
-                        />
-                      </div>
-                      
-                      {paymentMethods.length > 1 && (
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const newPayments = paymentMethods.filter((_, i) => i !== index);
-                              setPaymentMethods(newPayments);
-                            }}
-                            className="border-red-500 text-red-400 hover:bg-red-600 hover:text-white"
-                          >
-                            Remover
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  
-                  {paymentMethods.length > 1 && (
-                    <div className="text-sm text-gray-400">
-                      Total: {formatCurrency(paymentMethods.reduce((sum, p) => sum + (p.value || 0), 0))}
-                    </div>
-                  )}
+                <div>
+                  <Label className="text-gray-300">Forma de Pagamento</Label>
+                  <Select value={paymentMethod} onValueChange={(value: 'pix' | 'cartao' | 'dinheiro') => setPaymentMethod(value)}>
+                    <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-600 border-gray-500">
+                      <SelectItem value="pix" className="text-white hover:bg-gray-500">PIX</SelectItem>
+                      <SelectItem value="cartao" className="text-white hover:bg-gray-500">Cartão</SelectItem>
+                      <SelectItem value="dinheiro" className="text-white hover:bg-gray-500">Dinheiro</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </>
-            )}
-
-            {/* Conditional fields for D status */}
-            {saleStatus === 'D' && (
-              <div>
-                <Label className="text-gray-300">Tipo de Entrega</Label>
-                <Select value={photosQuantity} onValueChange={setPhotosQuantity}>
-                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-600 border-gray-500">
-                    <SelectItem value="courtesy" className="text-white hover:bg-gray-500">Foto Cortesia</SelectItem>
-                    <SelectItem value="none" className="text-white hover:bg-gray-500">Nenhuma</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             )}
 
             <div className="space-y-4 border-t border-gray-600 pt-4">

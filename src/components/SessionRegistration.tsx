@@ -14,7 +14,6 @@ interface Session {
   model: string;
   date: string;
   status: 'pending' | 'in_progress' | 'completed';
-  folderPath?: string;
 }
 
 const SessionRegistration = () => {
@@ -22,7 +21,6 @@ const SessionRegistration = () => {
   const [photographers, setPhotographers] = useState<string[]>([]);
   const [selectedPhotographer, setSelectedPhotographer] = useState('');
   const [modelName, setModelName] = useState('');
-  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -44,9 +42,6 @@ const SessionRegistration = () => {
   const saveSessions = (newSessions: Session[]) => {
     localStorage.setItem('photoSessions', JSON.stringify(newSessions));
     setSessions(newSessions);
-    
-    // Dispara evento para atualizar relatórios
-    window.dispatchEvent(new Event('localStorageUpdate'));
   };
 
   const handleAddSession = () => {
@@ -63,9 +58,8 @@ const SessionRegistration = () => {
       id: Date.now().toString(),
       photographer: selectedPhotographer,
       model: modelName.trim(),
-      date: new Date().toLocaleDateString('pt-BR'),
-      status: 'pending',
-      
+      date: new Date().toISOString().split('T')[0],
+      status: 'pending'
     };
 
     const updatedSessions = [...sessions, newSession];
@@ -73,7 +67,6 @@ const SessionRegistration = () => {
     
     setSelectedPhotographer('');
     setModelName('');
-    
     
     toast({
       title: "Sucesso",
@@ -140,12 +133,10 @@ const SessionRegistration = () => {
                 id="model"
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddSession()}
                 placeholder="Digite o nome do modelo"
                 className="bg-gray-600 border-gray-500 text-white placeholder:text-gray-400"
               />
             </div>
-            
           </div>
           
           <Button 
@@ -180,10 +171,10 @@ const SessionRegistration = () => {
                         <span className="text-xs text-gray-400">Modelo:</span>
                         <p className="text-white font-medium">{session.model}</p>
                       </div>
-                       <div>
-                         <span className="text-xs text-gray-400">Data:</span>
-                         <p className="text-white">{session.date}</p>
-                       </div>
+                      <div>
+                        <span className="text-xs text-gray-400">Data:</span>
+                        <p className="text-white">{new Date(session.date).toLocaleDateString('pt-BR')}</p>
+                      </div>
                       <div>
                         <span className="text-xs text-gray-400">Status:</span>
                         <p className={`font-medium ${getStatusColor(session.status)}`}>

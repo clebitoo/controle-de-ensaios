@@ -13,24 +13,17 @@ interface Session {
   status: string;
 }
 
-interface PaymentMethod {
-  method: 'pix' | 'cartao' | 'dinheiro';
-  value: number;
-}
-
 interface Sale {
   sessionId: string;
   seller: string;
   photosQuantity: number;
   saleValue: number;
-  paymentMethods: PaymentMethod[];
+  paymentMethod: 'pix' | 'cartao' | 'dinheiro';
   saleStatus: 'VD' | 'D' | 'NV';
   clientName: string;
   clientEmail: string;
   clientWhatsapp: string;
   timestamp: string;
-  deliveryStatus?: 'pending' | 'sent';
-  photoType?: 'selected' | 'complete' | 'courtesy' | 'none';
 }
 
 const Reports = () => {
@@ -42,22 +35,6 @@ const Reports = () => {
 
   useEffect(() => {
     loadData();
-    
-    // Listener para atualizações do localStorage
-    const handleStorageChange = () => {
-      loadData();
-    };
-    
-    // Escuta mudanças no localStorage de outras abas/componentes
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Escuta eventos customizados para mudanças na mesma aba
-    window.addEventListener('localStorageUpdate', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('localStorageUpdate', handleStorageChange);
-    };
   }, []);
 
   const loadData = () => {
@@ -111,13 +88,7 @@ const Reports = () => {
         return session?.photographer === photographer;
       });
       
-      const totalValue = photographerSales.reduce((sum, sale) => {
-        // Se tem múltiplas formas de pagamento, soma os valores
-        if (sale.paymentMethods && sale.paymentMethods.length > 0) {
-          return sum + sale.paymentMethods.reduce((pmSum, pm) => pmSum + pm.value, 0);
-        }
-        return sum + sale.saleValue;
-      }, 0);
+      const totalValue = photographerSales.reduce((sum, sale) => sum + sale.saleValue, 0);
       
       return {
         name: photographer,
@@ -129,13 +100,7 @@ const Reports = () => {
     // Cálculos por vendedor
     const sellerStats = sellers.map(seller => {
       const sellerSales = todaySales.filter(sale => sale.seller === seller);
-      const totalValue = sellerSales.reduce((sum, sale) => {
-        // Se tem múltiplas formas de pagamento, soma os valores
-        if (sale.paymentMethods && sale.paymentMethods.length > 0) {
-          return sum + sale.paymentMethods.reduce((pmSum, pm) => pmSum + pm.value, 0);
-        }
-        return sum + sale.saleValue;
-      }, 0);
+      const totalValue = sellerSales.reduce((sum, sale) => sum + sale.saleValue, 0);
       
       return {
         name: seller,
@@ -149,15 +114,9 @@ const Reports = () => {
     const nvCount = todaySales.filter(sale => sale.saleStatus === 'NV').length;
     
     const totalFolders = todaySessions.length;
-    const totalSold = todaySales.reduce((sum, sale) => {
-      // Se tem múltiplas formas de pagamento, soma os valores
-      if (sale.paymentMethods && sale.paymentMethods.length > 0) {
-        return sum + sale.paymentMethods.reduce((pmSum, pm) => pmSum + pm.value, 0);
-      }
-      return sum + sale.saleValue;
-    }, 0);
+    const totalSold = todaySales.reduce((sum, sale) => sum + sale.saleValue, 0);
     const foldersToShow = todaySessions.filter(session => 
-      !todaySales.some(sale => sale.sessionId === session.id)
+      !sales.some(sale => sale.sessionId === session.id)
     ).length;
 
     const report = `*Ranking ALCHYMIST ${getTodayDate()}
@@ -191,40 +150,13 @@ Total vendido: ${formatCurrency(totalSold)}`;
     const todaySales = getTodaySales();
     const todaySessions = getTodaySessions();
     
-    // Função para calcular o valor total de uma venda (considerando múltiplas formas de pagamento)
-    const getTotalSaleValue = (sale: Sale) => {
-      if (sale.paymentMethods && sale.paymentMethods.length > 0) {
-        return sale.paymentMethods.reduce((sum, pm) => sum + pm.value, 0);
-      }
-      return sale.saleValue;
-    };
-
     // Totais por forma de pagamento
-    let pixTotal = 0;
-    let cardTotal = 0;
-    let cashTotal = 0;
-
-    todaySales.forEach(sale => {
-      if (sale.paymentMethods && sale.paymentMethods.length > 0) {
-        sale.paymentMethods.forEach(pm => {
-          switch (pm.method) {
-            case 'pix':
-              pixTotal += pm.value;
-              break;
-            case 'cartao':
-              cardTotal += pm.value;
-              break;
-            case 'dinheiro':
-              cashTotal += pm.value;
-              break;
-          }
-        });
-      } else {
-        // Fallback para vendas antigas sem múltiplas formas de pagamento
-        // Não deve mais acontecer, mas mantemos para compatibilidade
-        console.warn('Venda sem paymentMethods:', sale);
-      }
-    });
+    const pixTotal = todaySales.filter(sale => sale.paymentMethod === 'pix')
+      .reduce((sum, sale) => sum + sale.saleValue, 0);
+    const cardTotal = todaySales.filter(sale => sale.paymentMethod === 'cartao')
+      .reduce((sum, sale) => sum + sale.saleValue, 0);
+    const cashTotal = todaySales.filter(sale => sale.paymentMethod === 'dinheiro')
+      .reduce((sum, sale) => sum + sale.saleValue, 0);
     
     const totalRevenue = pixTotal + cardTotal + cashTotal;
 
@@ -236,7 +168,7 @@ Total vendido: ${formatCurrency(totalSold)}`;
         return session?.photographer === photographer;
       });
       
-      const totalValue = photographerSales.reduce((sum, sale) => sum + getTotalSaleValue(sale), 0);
+      const totalValue = photographerSales.reduce((sum, sale) => sum + sale.saleValue, 0);
       
       return {
         name: photographer,
@@ -248,7 +180,7 @@ Total vendido: ${formatCurrency(totalSold)}`;
     // Cálculos por vendedor
     const sellerStats = sellers.map(seller => {
       const sellerSales = todaySales.filter(sale => sale.seller === seller);
-      const totalValue = sellerSales.reduce((sum, sale) => sum + getTotalSaleValue(sale), 0);
+      const totalValue = sellerSales.reduce((sum, sale) => sum + sale.saleValue, 0);
       const folders = sellerSales.length;
       
       return {
@@ -385,12 +317,7 @@ Média: ${formatCurrency(averageValue)}`;
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-yellow-400">
-                {formatCurrency(getTodaySales().reduce((sum, sale) => {
-                  if (sale.paymentMethods && sale.paymentMethods.length > 0) {
-                    return sum + sale.paymentMethods.reduce((pmSum, pm) => pmSum + pm.value, 0);
-                  }
-                  return sum + sale.saleValue;
-                }, 0))}
+                {formatCurrency(getTodaySales().reduce((sum, sale) => sum + sale.saleValue, 0))}
               </p>
               <p className="text-gray-400 text-sm">Faturamento</p>
             </div>
