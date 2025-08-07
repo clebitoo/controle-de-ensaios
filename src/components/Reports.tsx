@@ -35,6 +35,22 @@ const Reports = () => {
 
   useEffect(() => {
     loadData();
+    
+    // Listener para atualizações do localStorage
+    const handleStorageChange = () => {
+      loadData();
+    };
+    
+    // Escuta mudanças no localStorage de outras abas/componentes
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Escuta eventos customizados para mudanças na mesma aba
+    window.addEventListener('localStorageUpdate', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageUpdate', handleStorageChange);
+    };
   }, []);
 
   const loadData = () => {

@@ -44,6 +44,9 @@ const SessionRegistration = () => {
   const saveSessions = (newSessions: Session[]) => {
     localStorage.setItem('photoSessions', JSON.stringify(newSessions));
     setSessions(newSessions);
+    
+    // Dispara evento para atualizar relatórios
+    window.dispatchEvent(new Event('localStorageUpdate'));
   };
 
   const handleAddSession = () => {

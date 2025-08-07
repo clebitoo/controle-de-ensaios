@@ -179,6 +179,9 @@ const SalesManagement = () => {
     localStorage.setItem('photoSessions', JSON.stringify(updatedSessions));
     setSessions(updatedSessions);
     
+    // Dispara evento para atualizar relatórios
+    window.dispatchEvent(new Event('localStorageUpdate'));
+    
     setIsDialogOpen(false);
     resetForm();
     setSelectedSession(null);
