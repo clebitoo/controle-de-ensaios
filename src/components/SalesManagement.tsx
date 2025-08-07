@@ -20,9 +20,13 @@ interface Session {
 interface Sale {
   sessionId: string;
   seller: string;
+  photosType?: 'selected' | 'complete' | 'courtesy' | 'none';
   photosQuantity: number;
   saleValue: number;
-  paymentMethod: 'pix' | 'cartao' | 'dinheiro';
+  paymentMethods: Array<{
+    method: 'pix' | 'cartao' | 'dinheiro';
+    value: number;
+  }>;
   saleStatus: 'VD' | 'D' | 'NV';
   clientName: string;
   clientEmail: string;
@@ -42,9 +46,10 @@ const SalesManagement = () => {
 
   // Form states
   const [seller, setSeller] = useState('');
+  const [photosType, setPhotosType] = useState<'selected' | 'complete' | 'courtesy' | 'none'>('selected');
   const [photosQuantity, setPhotosQuantity] = useState('');
   const [saleValue, setSaleValue] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'cartao' | 'dinheiro'>('pix');
+  const [paymentMethods, setPaymentMethods] = useState<Array<{method: 'pix' | 'cartao' | 'dinheiro'; value: number}>>([{method: 'pix', value: 0}]);
   const [saleStatus, setSaleStatus] = useState<'VD' | 'D' | 'NV'>('VD');
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
@@ -72,9 +77,10 @@ const SalesManagement = () => {
 
   const resetForm = () => {
     setSeller('');
+    setPhotosType('selected');
     setPhotosQuantity('');
     setSaleValue('');
-    setPaymentMethod('pix');
+    setPaymentMethods([{method: 'pix', value: 0}]);
     setSaleStatus('VD');
     setClientName('');
     setClientEmail('');
@@ -97,9 +103,10 @@ const SalesManagement = () => {
     const existingSale = sales.find(sale => sale.sessionId === session.id);
     if (existingSale) {
       setSeller(existingSale.seller);
+      setPhotosType(existingSale.photosType || 'selected');
       setPhotosQuantity(existingSale.photosQuantity.toString());
       setSaleValue(existingSale.saleValue.toString());
-      setPaymentMethod(existingSale.paymentMethod);
+      setPaymentMethods(existingSale.paymentMethods || [{method: 'pix', value: existingSale.saleValue}]);
       setSaleStatus(existingSale.saleStatus);
       setClientName(existingSale.clientName);
       setClientEmail(existingSale.clientEmail);
@@ -112,7 +119,17 @@ const SalesManagement = () => {
   };
 
   const handleSaveSale = () => {
-    if (!selectedSession || !seller) {
+    if (!selectedSession) {
+      toast({
+        title: "Erro",
+        description: "Nenhum ensaio selecionado.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Skip seller validation for NV status
+    if (saleStatus !== 'NV' && !seller) {
       toast({
         title: "Erro",
         description: "Por favor, selecione um vendedor.",
@@ -122,10 +139,20 @@ const SalesManagement = () => {
     }
 
     // Validate required fields based on status
-    if (saleStatus === 'VD' && (!photosQuantity || !saleValue)) {
+    if (saleStatus === 'VD' && (!saleValue || parseFloat(saleValue) <= 0)) {
       toast({
         title: "Erro",
-        description: "Para vendas concluídas, preencha quantidade de fotos e valor.",
+        description: "Para vendas concluídas, preencha o valor da venda.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const totalPaymentValue = paymentMethods.reduce((sum, payment) => sum + payment.value, 0);
+    if (saleStatus === 'VD' && Math.abs(totalPaymentValue - parseFloat(saleValue || '0')) > 0.01) {
+      toast({
+        title: "Erro",
+        description: "A soma dos valores de pagamento deve ser igual ao valor da venda.",
         variant: "destructive"
       });
       return;
@@ -133,10 +160,11 @@ const SalesManagement = () => {
 
     const saleData: Sale = {
       sessionId: selectedSession.id,
-      seller,
-      photosQuantity: saleStatus === 'VD' ? parseInt(photosQuantity) : 0,
+      seller: saleStatus === 'NV' ? '' : seller,
+      photosType: saleStatus === 'VD' ? photosType : (saleStatus === 'D' ? photosType : undefined),
+      photosQuantity: saleStatus === 'VD' ? parseInt(photosQuantity) || 0 : 0,
       saleValue: saleStatus === 'VD' ? parseFloat(saleValue) : 0,
-      paymentMethod,
+      paymentMethods: saleStatus === 'VD' ? paymentMethods : [],
       saleStatus,
       clientName,
       clientEmail,
@@ -170,61 +198,88 @@ const SalesManagement = () => {
     });
   };
 
-  const handleDelivery = async (sessionId: string) => {
+  const handleDelivery = async (sessionId: string, type: 'wetransfer' | 'whatsapp') => {
     const sale = sales.find(s => s.sessionId === sessionId);
     
-    // Copy email to clipboard
-    if (sale?.clientEmail) {
-      try {
-        await navigator.clipboard.writeText(sale.clientEmail);
-        toast({
-          title: "E-mail copiado",
-          description: `${sale.clientEmail} copiado para a área de transferência.`,
-        });
-      } catch (error) {
-        console.error('Failed to copy email:', error);
-      }
-    }
-    
-    // Open WeTransfer
-    window.open('https://wetransfer.com/', '_blank');
-    
-    // Try to open file explorer with different approaches
-    try {
-      // Method 1: Create invisible file input
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.style.display = 'none';
-      input.multiple = true;
-      input.webkitdirectory = false;
-      input.setAttribute('webkitdirectory', '');
-      input.setAttribute('directory', '');
-      document.body.appendChild(input);
-      
-      // Add event listener before triggering click
-      input.addEventListener('cancel', () => {
-        document.body.removeChild(input);
-      });
-      
-      input.click();
-      
-      // Clean up after a delay
-      setTimeout(() => {
-        if (document.body.contains(input)) {
-          document.body.removeChild(input);
+    if (type === 'wetransfer') {
+      // Copy email to clipboard
+      if (sale?.clientEmail) {
+        try {
+          await navigator.clipboard.writeText(sale.clientEmail);
+          toast({
+            title: "E-mail copiado",
+            description: `${sale.clientEmail} copiado para a área de transferência.`,
+          });
+        } catch (error) {
+          console.error('Failed to copy email:', error);
         }
-      }, 1000);
-    } catch (error) {
-      console.log('Method 1 failed, trying alternative approaches');
+      }
       
-      // Method 2: Try different file input approach
+      // Open WeTransfer
+      window.open('https://wetransfer.com/', '_blank');
+      
+      // Try to open file explorer with different approaches
       try {
-        const input2 = document.createElement('input');
-        input2.type = 'file';
-        input2.multiple = true;
-        input2.click();
-      } catch (error2) {
-        console.log('File explorer opening methods failed:', error2);
+        // Method 1: Create invisible file input
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.style.display = 'none';
+        input.multiple = true;
+        input.webkitdirectory = false;
+        input.setAttribute('webkitdirectory', '');
+        input.setAttribute('directory', '');
+        document.body.appendChild(input);
+        
+        // Add event listener before triggering click
+        input.addEventListener('cancel', () => {
+          document.body.removeChild(input);
+        });
+        
+        input.click();
+        
+        // Clean up after a delay
+        setTimeout(() => {
+          if (document.body.contains(input)) {
+            document.body.removeChild(input);
+          }
+        }, 1000);
+      } catch (error) {
+        console.log('Method 1 failed, trying alternative approaches');
+        
+        // Method 2: Try different file input approach
+        try {
+          const input2 = document.createElement('input');
+          input2.type = 'file';
+          input2.multiple = true;
+          input2.click();
+        } catch (error2) {
+          console.log('File explorer opening methods failed:', error2);
+        }
+      }
+
+      toast({
+        title: "Entrega iniciada",
+        description: "WeTransfer aberto, e-mail copiado e status atualizado.",
+      });
+    } else if (type === 'whatsapp') {
+      // Open WhatsApp Web
+      if (sale?.clientWhatsapp) {
+        const phoneNumber = sale.clientWhatsapp.replace(/\D/g, '');
+        const message = `Olá! Suas fotos do ensaio estão prontas. Em breve enviaremos o link para download.`;
+        const whatsappUrl = `https://web.whatsapp.com/send?phone=55${phoneNumber}&text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+        
+        toast({
+          title: "WhatsApp aberto",
+          description: "Conversa iniciada no WhatsApp Web.",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: "Número do WhatsApp não informado.",
+          variant: "destructive"
+        });
+        return;
       }
     }
 
@@ -237,11 +292,6 @@ const SalesManagement = () => {
     
     localStorage.setItem('photoSales', JSON.stringify(updatedSales));
     setSales(updatedSales);
-    
-    toast({
-      title: "Entrega iniciada",
-      description: "WeTransfer aberto, e-mail copiado e status atualizado.",
-    });
   };
 
   const getSaleInfo = (sessionId: string) => {
@@ -273,6 +323,23 @@ const SalesManagement = () => {
       case 'dinheiro': return 'Dinheiro';
       default: return method;
     }
+  };
+
+  const addPaymentMethod = () => {
+    setPaymentMethods([...paymentMethods, {method: 'pix', value: 0}]);
+  };
+
+  const removePaymentMethod = (index: number) => {
+    if (paymentMethods.length > 1) {
+      const newMethods = paymentMethods.filter((_, i) => i !== index);
+      setPaymentMethods(newMethods);
+    }
+  };
+
+  const updatePaymentMethod = (index: number, field: 'method' | 'value', value: any) => {
+    const newMethods = [...paymentMethods];
+    newMethods[index] = { ...newMethods[index], [field]: value };
+    setPaymentMethods(newMethods);
   };
 
   const getDeliveryStatusColor = (status?: string) => {
@@ -399,15 +466,26 @@ const SalesManagement = () => {
                     
                     <div className="flex gap-2 ml-4">
                       {saleInfo && saleInfo.saleStatus === 'VD' && saleInfo.deliveryStatus === 'pending' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelivery(session.id)}
-                          className="bg-green-600 hover:bg-green-700 border-green-500 text-white"
-                        >
-                          <Send size={16} />
-                          Enviar
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelivery(session.id, 'wetransfer')}
+                            className="bg-green-600 hover:bg-green-700 border-green-500 text-white"
+                          >
+                            <Send size={16} />
+                            WeTransfer
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelivery(session.id, 'whatsapp')}
+                            className="bg-green-600 hover:bg-green-700 border-green-500 text-white"
+                          >
+                            <ExternalLink size={16} />
+                            WhatsApp
+                          </Button>
+                        </>
                       )}
                       
                       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -463,21 +541,23 @@ const SalesManagement = () => {
           
           <div className="space-y-4 max-h-96 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-gray-300">Vendedor *</Label>
-                <Select value={seller} onValueChange={setSeller}>
-                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
-                    <SelectValue placeholder="Selecione o vendedor" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-600 border-gray-500">
-                    {sellers.map((sellerName) => (
-                      <SelectItem key={sellerName} value={sellerName} className="text-white hover:bg-gray-500">
-                        {sellerName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {saleStatus !== 'NV' && (
+                <div>
+                  <Label className="text-gray-300">Vendedor *</Label>
+                  <Select value={seller} onValueChange={setSeller}>
+                    <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                      <SelectValue placeholder="Selecione o vendedor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-600 border-gray-500">
+                      {sellers.map((sellerName) => (
+                        <SelectItem key={sellerName} value={sellerName} className="text-white hover:bg-gray-500">
+                          {sellerName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               
               <div>
                 <Label className="text-gray-300">Status da Venda *</Label>
@@ -499,14 +579,16 @@ const SalesManagement = () => {
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-gray-300">Quantidade de Fotos *</Label>
-                    <Input
-                      value={photosQuantity}
-                      onChange={(e) => setPhotosQuantity(e.target.value)}
-                      type="number"
-                      placeholder="Ex: 10"
-                      className="bg-gray-600 border-gray-500 text-white"
-                    />
+                    <Label className="text-gray-300">Tipo de Fotos *</Label>
+                    <Select value={photosType} onValueChange={(value: 'selected' | 'complete') => setPhotosType(value)}>
+                      <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-600 border-gray-500">
+                        <SelectItem value="selected" className="text-white hover:bg-gray-500">Apenas Selecionadas</SelectItem>
+                        <SelectItem value="complete" className="text-white hover:bg-gray-500">Ensaio Completo</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div>
@@ -522,58 +604,121 @@ const SalesManagement = () => {
                   </div>
                 </div>
 
-                <div>
-                  <Label className="text-gray-300">Forma de Pagamento</Label>
-                  <Select value={paymentMethod} onValueChange={(value: 'pix' | 'cartao' | 'dinheiro') => setPaymentMethod(value)}>
-                    <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-600 border-gray-500">
-                      <SelectItem value="pix" className="text-white hover:bg-gray-500">PIX</SelectItem>
-                      <SelectItem value="cartao" className="text-white hover:bg-gray-500">Cartão</SelectItem>
-                      <SelectItem value="dinheiro" className="text-white hover:bg-gray-500">Dinheiro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-300">Formas de Pagamento</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addPaymentMethod}
+                      className="border-gray-500 text-gray-300 hover:bg-gray-700"
+                    >
+                      + Adicionar
+                    </Button>
+                  </div>
+                  
+                  {paymentMethods.map((payment, index) => (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                      <div>
+                        <Label className="text-gray-300 text-sm">Método</Label>
+                        <Select 
+                          value={payment.method} 
+                          onValueChange={(value: 'pix' | 'cartao' | 'dinheiro') => updatePaymentMethod(index, 'method', value)}
+                        >
+                          <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-gray-600 border-gray-500">
+                            <SelectItem value="pix" className="text-white hover:bg-gray-500">PIX</SelectItem>
+                            <SelectItem value="cartao" className="text-white hover:bg-gray-500">Cartão</SelectItem>
+                            <SelectItem value="dinheiro" className="text-white hover:bg-gray-500">Dinheiro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label className="text-gray-300 text-sm">Valor (R$)</Label>
+                        <Input
+                          value={payment.value || ''}
+                          onChange={(e) => updatePaymentMethod(index, 'value', parseFloat(e.target.value) || 0)}
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          className="bg-gray-600 border-gray-500 text-white"
+                        />
+                      </div>
+                      
+                      {paymentMethods.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removePaymentMethod(index)}
+                        >
+                          Remover
+                        </Button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </>
             )}
 
-            <div className="space-y-4 border-t border-gray-600 pt-4">
-              <h4 className="text-blue-300 font-medium">Dados do Cliente</h4>
-              
+            {/* Conditional fields for D status */}
+            {saleStatus === 'D' && (
               <div>
-                <Label className="text-gray-300">Nome</Label>
-                <Input
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  placeholder="Nome do cliente"
-                  className="bg-gray-600 border-gray-500 text-white"
-                />
+                <Label className="text-gray-300">Tipo de Foto</Label>
+                <Select value={photosType} onValueChange={(value: 'courtesy' | 'none') => setPhotosType(value)}>
+                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-600 border-gray-500">
+                    <SelectItem value="courtesy" className="text-white hover:bg-gray-500">Foto Cortesia</SelectItem>
+                    <SelectItem value="none" className="text-white hover:bg-gray-500">Nenhuma</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            )}
+
+            {saleStatus !== 'NV' && (
+              <div className="space-y-4 border-t border-gray-600 pt-4">
+                <h4 className="text-blue-300 font-medium">Dados do Cliente</h4>
+                
                 <div>
-                  <Label className="text-gray-300">E-mail</Label>
+                  <Label className="text-gray-300">Nome</Label>
                   <Input
-                    value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
-                    type="email"
-                    placeholder="email@exemplo.com"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    placeholder="Nome do cliente"
                     className="bg-gray-600 border-gray-500 text-white"
                   />
                 </div>
                 
-                <div>
-                  <Label className="text-gray-300">WhatsApp</Label>
-                  <Input
-                    value={clientWhatsapp}
-                    onChange={(e) => setClientWhatsapp(e.target.value)}
-                    placeholder="(11) 99999-9999"
-                    className="bg-gray-600 border-gray-500 text-white"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-300">E-mail</Label>
+                    <Input
+                      value={clientEmail}
+                      onChange={(e) => setClientEmail(e.target.value)}
+                      type="email"
+                      placeholder="email@exemplo.com"
+                      className="bg-gray-600 border-gray-500 text-white"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label className="text-gray-300">WhatsApp</Label>
+                    <Input
+                      value={clientWhatsapp}
+                      onChange={(e) => setClientWhatsapp(e.target.value)}
+                      placeholder="(11) 99999-9999"
+                      className="bg-gray-600 border-gray-500 text-white"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="flex gap-2 pt-4 border-t border-gray-600">
