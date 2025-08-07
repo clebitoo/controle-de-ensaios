@@ -133,11 +133,6 @@ const SessionRegistration = () => {
                 id="model"
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleAddSession();
-                  }
-                }}
                 placeholder="Digite o nome do modelo"
                 className="bg-gray-600 border-gray-500 text-white placeholder:text-gray-400"
               />
