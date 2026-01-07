@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Edit, DollarSign, Send, ExternalLink, Filter, Plus, Trash2 } from 'lucide-react';
+import { Edit, DollarSign, Send, ExternalLink, Filter, Plus, Trash2, MessageCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 interface Session {
@@ -434,15 +434,34 @@ const SalesManagement = () => {
                     
                     <div className="flex gap-2 ml-4">
                       {saleInfo && saleInfo.saleStatus === 'VD' && saleInfo.deliveryStatus === 'pending' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelivery(session.id)}
-                          className="bg-green-600 hover:bg-green-700 border-green-500 text-white"
-                        >
-                          <Send size={16} />
-                          Enviar
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelivery(session.id)}
+                            className="bg-green-600 hover:bg-green-700 border-green-500 text-white"
+                            title="Enviar via WeTransfer"
+                          >
+                            <Send size={16} />
+                            WeTransfer
+                          </Button>
+                          {saleInfo.clientWhatsapp && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const phone = saleInfo.clientWhatsapp.replace(/\D/g, '');
+                                const phoneWithCountry = phone.startsWith('55') ? phone : `55${phone}`;
+                                window.open(`https://web.whatsapp.com/send?phone=${phoneWithCountry}`, '_blank');
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 border-emerald-500 text-white"
+                              title="Enviar via WhatsApp"
+                            >
+                              <MessageCircle size={16} />
+                              WhatsApp
+                            </Button>
+                          )}
+                        </>
                       )}
                       
                       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
