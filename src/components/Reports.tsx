@@ -13,12 +13,18 @@ interface Session {
   status: string;
 }
 
+interface PaymentEntry {
+  method: 'pix' | 'cartao' | 'dinheiro';
+  value: number;
+}
+
 interface Sale {
   sessionId: string;
   seller: string;
   photosQuantity: number;
   saleValue: number;
   paymentMethod: 'pix' | 'cartao' | 'dinheiro';
+  payments?: PaymentEntry[];
   saleStatus: 'VD' | 'D' | 'NV';
   clientName: string;
   clientEmail: string;
@@ -150,13 +156,25 @@ Total vendido: ${formatCurrency(totalSold)}`;
     const todaySales = getTodaySales();
     const todaySessions = getTodaySessions();
     
-    // Totais por forma de pagamento
-    const pixTotal = todaySales.filter(sale => sale.paymentMethod === 'pix')
-      .reduce((sum, sale) => sum + sale.saleValue, 0);
-    const cardTotal = todaySales.filter(sale => sale.paymentMethod === 'cartao')
-      .reduce((sum, sale) => sum + sale.saleValue, 0);
-    const cashTotal = todaySales.filter(sale => sale.paymentMethod === 'dinheiro')
-      .reduce((sum, sale) => sum + sale.saleValue, 0);
+    // Totais por forma de pagamento (considerando múltiplas formas)
+    let pixTotal = 0;
+    let cardTotal = 0;
+    let cashTotal = 0;
+    
+    todaySales.forEach(sale => {
+      if (sale.payments && sale.payments.length > 0) {
+        sale.payments.forEach(payment => {
+          if (payment.method === 'pix') pixTotal += payment.value;
+          else if (payment.method === 'cartao') cardTotal += payment.value;
+          else if (payment.method === 'dinheiro') cashTotal += payment.value;
+        });
+      } else {
+        // Fallback para vendas antigas sem o campo payments
+        if (sale.paymentMethod === 'pix') pixTotal += sale.saleValue;
+        else if (sale.paymentMethod === 'cartao') cardTotal += sale.saleValue;
+        else if (sale.paymentMethod === 'dinheiro') cashTotal += sale.saleValue;
+      }
+    });
     
     const totalRevenue = pixTotal + cardTotal + cashTotal;
 
@@ -196,9 +214,9 @@ Total vendido: ${formatCurrency(totalSold)}`;
     const nvCount = todaySales.filter(sale => sale.saleStatus === 'NV').length;
     
     const totalFolders = todaySessions.length;
-    // Média apenas das vendas VD
-    const vdSales = todaySales.filter(sale => sale.saleStatus === 'VD');
-    const averageValue = vdSales.length > 0 ? totalRevenue / vdSales.length : 0;
+    // Média baseada em todas as pastas atendidas (VD + NV), excluindo D
+    const vdNvSales = todaySales.filter(sale => sale.saleStatus === 'VD' || sale.saleStatus === 'NV');
+    const averageValue = vdNvSales.length > 0 ? totalRevenue / vdNvSales.length : 0;
 
     const report = `*Faturamento ALCHYMIST ${getTodayDate()}*
 
