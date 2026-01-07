@@ -452,7 +452,7 @@ const SalesManagement = () => {
                               onClick={() => {
                                 const phone = saleInfo.clientWhatsapp.replace(/\D/g, '');
                                 const phoneWithCountry = phone.startsWith('55') ? phone : `55${phone}`;
-                                window.open(`https://web.whatsapp.com/send?phone=${phoneWithCountry}`, '_blank');
+                                window.open(`https://wa.me/${phoneWithCountry}`, '_blank');
                               }}
                               className="bg-emerald-600 hover:bg-emerald-700 border-emerald-500 text-white"
                               title="Enviar via WhatsApp"
