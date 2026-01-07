@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Edit, DollarSign, Send, ExternalLink, Filter } from 'lucide-react';
+import { Edit, DollarSign, Send, ExternalLink, Filter, Plus, Trash2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 interface Session {
@@ -17,12 +17,18 @@ interface Session {
   status: 'pending' | 'in_progress' | 'completed';
 }
 
+interface PaymentEntry {
+  method: 'pix' | 'cartao' | 'dinheiro';
+  value: number;
+}
+
 interface Sale {
   sessionId: string;
   seller: string;
   photosQuantity: number;
   saleValue: number;
   paymentMethod: 'pix' | 'cartao' | 'dinheiro';
+  payments?: PaymentEntry[];
   saleStatus: 'VD' | 'D' | 'NV';
   clientName: string;
   clientEmail: string;
@@ -45,6 +51,7 @@ const SalesManagement = () => {
   const [photosQuantity, setPhotosQuantity] = useState('');
   const [saleValue, setSaleValue] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'cartao' | 'dinheiro'>('pix');
+  const [payments, setPayments] = useState<PaymentEntry[]>([{ method: 'pix', value: 0 }]);
   const [saleStatus, setSaleStatus] = useState<'VD' | 'D' | 'NV'>('VD');
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
@@ -75,6 +82,7 @@ const SalesManagement = () => {
     setPhotosQuantity('');
     setSaleValue('');
     setPaymentMethod('pix');
+    setPayments([{ method: 'pix', value: 0 }]);
     setSaleStatus('VD');
     setClientName('');
     setClientEmail('');
@@ -100,6 +108,7 @@ const SalesManagement = () => {
       setPhotosQuantity(existingSale.photosQuantity.toString());
       setSaleValue(existingSale.saleValue.toString());
       setPaymentMethod(existingSale.paymentMethod);
+      setPayments(existingSale.payments || [{ method: existingSale.paymentMethod, value: existingSale.saleValue }]);
       setSaleStatus(existingSale.saleStatus);
       setClientName(existingSale.clientName);
       setClientEmail(existingSale.clientEmail);
@@ -121,11 +130,14 @@ const SalesManagement = () => {
       return;
     }
 
+    // Calculate total from payments
+    const totalFromPayments = payments.reduce((sum, p) => sum + p.value, 0);
+
     // Validate required fields based on status
-    if (saleStatus === 'VD' && (!photosQuantity || !saleValue)) {
+    if (saleStatus === 'VD' && (!photosQuantity || totalFromPayments <= 0)) {
       toast({
         title: "Erro",
-        description: "Para vendas concluídas, preencha quantidade de fotos e valor.",
+        description: "Para vendas concluídas, preencha quantidade de fotos e pelo menos um valor de pagamento.",
         variant: "destructive"
       });
       return;
@@ -135,8 +147,9 @@ const SalesManagement = () => {
       sessionId: selectedSession.id,
       seller,
       photosQuantity: saleStatus === 'VD' ? parseInt(photosQuantity) : 0,
-      saleValue: saleStatus === 'VD' ? parseFloat(saleValue) : 0,
-      paymentMethod,
+      saleValue: saleStatus === 'VD' ? totalFromPayments : 0,
+      paymentMethod: payments[0]?.method || 'pix',
+      payments: saleStatus === 'VD' ? payments.filter(p => p.value > 0) : [],
       saleStatus,
       clientName,
       clientEmail,
@@ -168,6 +181,28 @@ const SalesManagement = () => {
       title: "Sucesso",
       description: "Venda registrada com sucesso!",
     });
+  };
+
+  const addPaymentMethod = () => {
+    if (payments.length < 3) {
+      setPayments([...payments, { method: 'pix', value: 0 }]);
+    }
+  };
+
+  const removePaymentMethod = (index: number) => {
+    if (payments.length > 1) {
+      setPayments(payments.filter((_, i) => i !== index));
+    }
+  };
+
+  const updatePayment = (index: number, field: 'method' | 'value', value: string | number) => {
+    const newPayments = [...payments];
+    if (field === 'method') {
+      newPayments[index].method = value as 'pix' | 'cartao' | 'dinheiro';
+    } else {
+      newPayments[index].value = typeof value === 'string' ? parseFloat(value) || 0 : value;
+    }
+    setPayments(newPayments);
   };
 
   const handleDelivery = async (sessionId: string) => {
@@ -497,43 +532,78 @@ const SalesManagement = () => {
             {/* Conditional fields for VD status */}
             {saleStatus === 'VD' && (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-gray-300">Quantidade de Fotos *</Label>
-                    <Input
-                      value={photosQuantity}
-                      onChange={(e) => setPhotosQuantity(e.target.value)}
-                      type="number"
-                      placeholder="Ex: 10"
-                      className="bg-gray-600 border-gray-500 text-white"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className="text-gray-300">Valor da Venda (R$) *</Label>
-                    <Input
-                      value={saleValue}
-                      onChange={(e) => setSaleValue(e.target.value)}
-                      type="number"
-                      step="0.01"
-                      placeholder="Ex: 150,00"
-                      className="bg-gray-600 border-gray-500 text-white"
-                    />
-                  </div>
+                <div>
+                  <Label className="text-gray-300">Quantidade de Fotos *</Label>
+                  <Input
+                    value={photosQuantity}
+                    onChange={(e) => setPhotosQuantity(e.target.value)}
+                    type="number"
+                    placeholder="Ex: 10"
+                    className="bg-gray-600 border-gray-500 text-white"
+                  />
                 </div>
 
-                <div>
-                  <Label className="text-gray-300">Forma de Pagamento</Label>
-                  <Select value={paymentMethod} onValueChange={(value: 'pix' | 'cartao' | 'dinheiro') => setPaymentMethod(value)}>
-                    <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-600 border-gray-500">
-                      <SelectItem value="pix" className="text-white hover:bg-gray-500">PIX</SelectItem>
-                      <SelectItem value="cartao" className="text-white hover:bg-gray-500">Cartão</SelectItem>
-                      <SelectItem value="dinheiro" className="text-white hover:bg-gray-500">Dinheiro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-300">Formas de Pagamento *</Label>
+                    {payments.length < 3 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addPaymentMethod}
+                        className="bg-gray-600 border-gray-500 text-white hover:bg-gray-500"
+                      >
+                        <Plus size={14} className="mr-1" />
+                        Adicionar
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {payments.map((payment, index) => (
+                    <div key={index} className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <Select 
+                          value={payment.method} 
+                          onValueChange={(value: 'pix' | 'cartao' | 'dinheiro') => updatePayment(index, 'method', value)}
+                        >
+                          <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-gray-600 border-gray-500">
+                            <SelectItem value="pix" className="text-white hover:bg-gray-500">PIX</SelectItem>
+                            <SelectItem value="cartao" className="text-white hover:bg-gray-500">Cartão</SelectItem>
+                            <SelectItem value="dinheiro" className="text-white hover:bg-gray-500">Dinheiro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1">
+                        <Input
+                          value={payment.value || ''}
+                          onChange={(e) => updatePayment(index, 'value', e.target.value)}
+                          type="number"
+                          step="0.01"
+                          placeholder="Valor (R$)"
+                          className="bg-gray-600 border-gray-500 text-white"
+                        />
+                      </div>
+                      {payments.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removePaymentMethod(index)}
+                          className="px-2"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  
+                  <div className="text-right text-sm text-gray-400">
+                    Total: {formatCurrency(payments.reduce((sum, p) => sum + (p.value || 0), 0))}
+                  </div>
                 </div>
               </>
             )}
