@@ -203,12 +203,14 @@ Total vendido: ${formatCurrency(totalSold)}`;
     const sellerStats = sellers.map(seller => {
       const sellerSales = todaySales.filter(sale => sale.seller === seller);
       const totalValue = sellerSales.reduce((sum, sale) => sum + sale.saleValue, 0);
-      const folders = sellerSales.length;
+      const totalFoldersAttended = sellerSales.length;
+      const soldFolders = sellerSales.filter(sale => sale.saleStatus === 'VD').length;
       
       return {
         name: seller,
         value: totalValue,
-        folders: folders
+        folders: totalFoldersAttended,
+        soldFolders
       };
     });
 
