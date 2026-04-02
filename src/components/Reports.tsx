@@ -95,11 +95,13 @@ const Reports = () => {
       });
       
       const totalValue = photographerSales.reduce((sum, sale) => sum + sale.saleValue, 0);
+      const soldFolders = photographerSales.filter(sale => sale.saleStatus === 'VD').length;
       
       return {
         name: photographer,
         value: totalValue,
-        folders: photographerSessions.length
+        folders: photographerSessions.length,
+        soldFolders
       };
     });
 
@@ -135,7 +137,7 @@ atualizado: ${getCurrentTime()}*
 **Fotógrafos**
  
 ${photographerStats.map(p => 
-  `${p.name}: ${formatCurrency(p.value)} / ${p.folders} pastas`
+  `${p.name}: ${formatCurrency(p.value)} / ${p.folders} pastas (${p.soldFolders}/${p.folders})`
 ).join('\n')}
 
 **Vendedores**
@@ -191,11 +193,13 @@ Total vendido: ${formatCurrency(totalSold)}`;
       });
       
       const totalValue = photographerSales.reduce((sum, sale) => sum + sale.saleValue, 0);
+      const soldFolders = photographerSales.filter(sale => sale.saleStatus === 'VD').length;
       
       return {
         name: photographer,
         value: totalValue,
-        folders: photographerSessions.length
+        folders: photographerSessions.length,
+        soldFolders
       };
     });
 
@@ -235,7 +239,7 @@ Dinheiro: ${formatCurrency(cashTotal)}
 *Fotógrafos*
 
 ${photographerStats.map(p => 
-  `${p.name}: ${formatCurrency(p.value)} / ${p.folders} pastas`
+  `${p.name}: ${formatCurrency(p.value)} / ${p.folders} pastas (${p.soldFolders}/${p.folders})`
 ).join('\n')}
 
 *Vendedor*
