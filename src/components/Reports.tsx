@@ -239,7 +239,7 @@ Dinheiro: ${formatCurrency(cashTotal)}
 *Fotógrafos*
 
 ${photographerStats.map(p => 
-  `${p.name}: ${formatCurrency(p.value)} / ${p.folders} pastas`
+  `${p.name}: ${formatCurrency(p.value)} / ${p.folders} pastas (${p.soldFolders}/${p.folders})`
 ).join('\n')}
 
 *Vendedor*
