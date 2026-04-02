@@ -241,7 +241,7 @@ ${photographerStats.map(p =>
 *Vendedor*
 
 ${sellerStats.map(s => 
-  `${s.name}: ${formatCurrency(s.value)} / ${s.folders} pastas`
+  `${s.name}: ${formatCurrency(s.value)} / ${s.folders} pastas (${s.soldFolders}/${s.folders})`
 ).join('\n')}
 
 Nv: ${nvCount}
