@@ -26,7 +26,7 @@ const Configuration = () => {
       setPhotographers(JSON.parse(savedPhotographers));
     } else {
       // Fotógrafos padrão baseados no exemplo
-      const defaultPhotographers = ['Fabricio'];
+      const defaultPhotographers = ['Fabrício', 'Rafael', 'Eduarda', 'Gessica'];
       setPhotographers(defaultPhotographers);
       localStorage.setItem('photographers', JSON.stringify(defaultPhotographers));
     }
