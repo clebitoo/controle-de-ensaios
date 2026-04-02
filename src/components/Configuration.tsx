@@ -26,7 +26,7 @@ const Configuration = () => {
       setPhotographers(JSON.parse(savedPhotographers));
     } else {
       // Fotógrafos padrão baseados no exemplo
-      const defaultPhotographers = ['Fabricio'];
+      const defaultPhotographers = ['Fabrício', 'Rafael', 'Eduarda', 'Gessica'];
       setPhotographers(defaultPhotographers);
       localStorage.setItem('photographers', JSON.stringify(defaultPhotographers));
     }
@@ -35,7 +35,7 @@ const Configuration = () => {
       setSellers(JSON.parse(savedSellers));
     } else {
       // Vendedores padrão baseados no exemplo
-      const defaultSellers = ['Ingrid'];
+      const defaultSellers = ['Ingrid', 'Andressa', 'Vinícius'];
       setSellers(defaultSellers);
       localStorage.setItem('sellers', JSON.stringify(defaultSellers));
     }
