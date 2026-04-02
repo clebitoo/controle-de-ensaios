@@ -147,7 +147,7 @@ const SalesManagement = () => {
 
     const saleData: Sale = {
       sessionId: selectedSession.id,
-      seller,
+      seller: saleStatus === 'D' ? '' : seller,
       photosQuantity: saleStatus === 'VD' ? parseInt(photosQuantity) : 0,
       saleValue: saleStatus === 'VD' ? totalFromPayments : 0,
       paymentMethod: payments[0]?.method || 'pix',
