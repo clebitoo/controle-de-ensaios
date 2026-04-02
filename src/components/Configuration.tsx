@@ -35,7 +35,7 @@ const Configuration = () => {
       setSellers(JSON.parse(savedSellers));
     } else {
       // Vendedores padrão baseados no exemplo
-      const defaultSellers = ['Ingrid'];
+      const defaultSellers = ['Ingrid', 'Andressa', 'Vinícius'];
       setSellers(defaultSellers);
       localStorage.setItem('sellers', JSON.stringify(defaultSellers));
     }
