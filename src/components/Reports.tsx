@@ -107,10 +107,14 @@ const Reports = () => {
     const sellerStats = sellers.map(seller => {
       const sellerSales = todaySales.filter(sale => sale.seller === seller);
       const totalValue = sellerSales.reduce((sum, sale) => sum + sale.saleValue, 0);
+      const totalFoldersAttended = sellerSales.length;
+      const soldFolders = sellerSales.filter(sale => sale.saleStatus === 'VD').length;
       
       return {
         name: seller,
-        value: totalValue
+        value: totalValue,
+        folders: totalFoldersAttended,
+        soldFolders
       };
     });
 
@@ -137,7 +141,7 @@ ${photographerStats.map(p =>
 **Vendedores**
 
 ${sellerStats.map(s => 
-  `${s.name}: ${formatCurrency(s.value)}`
+  `${s.name}: ${formatCurrency(s.value)} / ${s.folders} pastas (${s.soldFolders}/${s.folders})`
 ).join('\n')}
 
 Pastas a mostrar: ${foldersToShow}
@@ -199,12 +203,14 @@ Total vendido: ${formatCurrency(totalSold)}`;
     const sellerStats = sellers.map(seller => {
       const sellerSales = todaySales.filter(sale => sale.seller === seller);
       const totalValue = sellerSales.reduce((sum, sale) => sum + sale.saleValue, 0);
-      const folders = sellerSales.length;
+      const totalFoldersAttended = sellerSales.length;
+      const soldFolders = sellerSales.filter(sale => sale.saleStatus === 'VD').length;
       
       return {
         name: seller,
         value: totalValue,
-        folders: folders
+        folders: totalFoldersAttended,
+        soldFolders
       };
     });
 
@@ -235,7 +241,7 @@ ${photographerStats.map(p =>
 *Vendedor*
 
 ${sellerStats.map(s => 
-  `${s.name}: ${formatCurrency(s.value)} / ${s.folders} pastas`
+  `${s.name}: ${formatCurrency(s.value)} / ${s.folders} pastas (${s.soldFolders}/${s.folders})`
 ).join('\n')}
 
 Nv: ${nvCount}
