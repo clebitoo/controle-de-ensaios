@@ -121,7 +121,9 @@ const SalesManagement = () => {
   };
 
   const handleSaveSale = () => {
-    if (!selectedSession || !seller) {
+    if (!selectedSession) return;
+    
+    if ((saleStatus === 'VD' || saleStatus === 'NV') && !seller) {
       toast({
         title: "Erro",
         description: "Por favor, selecione um vendedor.",
