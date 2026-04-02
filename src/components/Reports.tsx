@@ -95,11 +95,13 @@ const Reports = () => {
       });
       
       const totalValue = photographerSales.reduce((sum, sale) => sum + sale.saleValue, 0);
+      const soldFolders = photographerSales.filter(sale => sale.saleStatus === 'VD').length;
       
       return {
         name: photographer,
         value: totalValue,
-        folders: photographerSessions.length
+        folders: photographerSessions.length,
+        soldFolders
       };
     });
 
