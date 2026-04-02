@@ -520,22 +520,7 @@ const SalesManagement = () => {
           <div className="space-y-4 max-h-96 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label className="text-gray-300">Vendedor *</Label>
-                <Select value={seller} onValueChange={setSeller}>
-                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
-                    <SelectValue placeholder="Selecione o vendedor" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-600 border-gray-500">
-                    {sellers.map((sellerName) => (
-                      <SelectItem key={sellerName} value={sellerName} className="text-white hover:bg-gray-500">
-                        {sellerName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
+                <Label className="text-gray-300">Status da Venda *</Label>
                 <Label className="text-gray-300">Status da Venda *</Label>
                 <Select value={saleStatus} onValueChange={(value: 'VD' | 'D' | 'NV') => setSaleStatus(value)}>
                   <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
